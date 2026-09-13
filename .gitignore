@@ -1,0 +1,9 @@
+# CheckMaker ignore
+.git/
+dist/
+__pycache__/
+history.json
+*.log
+.pytest_cache/
+.idea/
+.vscode/

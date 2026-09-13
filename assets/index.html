@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>[[CSS_SRC]]</style>
+    <script>[[MARKED_SRC]]</script>
+    <style>
+        body { background-color: #0d1117; color: #c9d1d9; padding: 0; margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        #header { background: #161b22; padding: 8px 20px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; z-index: 100; }
+        #tab-bar { background: #0d1117; display: flex; overflow-x: auto; border-bottom: 1px solid #30363d; padding: 0 10px; min-height: 36px; }
+        .tab { padding: 8px 16px; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0; cursor: pointer; font-size: 13px; color: #8b949e; display: flex; align-items: center; white-space: nowrap; margin-top: 5px; }
+        .tab:hover { color: #c9d1d9; background: #161b22; }
+        .tab.active { color: #c9d1d9; background: #0d1117; border-color: #30363d; border-bottom: 1px solid #0d1117; margin-bottom: -1px; position: relative; font-weight: 600; }
+        .tab-close { margin-left: 8px; font-size: 14px; opacity: 0.5; padding: 0 4px; }
+        .tab-close:hover { opacity: 1; color: #f85149; }
+        .tab-stale-icon { color: #d29922; margin-right: 6px; font-size: 14px; }
+        #selector { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 40px; text-align: center; }
+        #drop-zone { border: 2px dashed #30363d; border-radius: 6px; padding: 40px; width: 80%; cursor: pointer; margin-bottom: 20px; transition: all 0.2s; }
+        #drop-zone.drag-over { background: #161b22; border-color: #58a6ff; transform: scale(1.02); }
+        input[type="text"] { background: #0d1117; border: 1px solid #30363d; color: white; padding: 8px 12px; width: 80%; border-radius: 6px; margin-bottom: 10px; }
+        button { background-color: #238636; color: white; border: none; border-radius: 6px; padding: 6px 16px; cursor: pointer; font-weight: 600; }
+        button:hover { background-color: #2ea043; }
+        #viewer-container { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; }
+        #viewer { padding: 30px 60px; overflow-y: auto; flex-grow: 1; position: relative; }
+        .file-path { font-size: 10px; color: #484f58; font-family: ui-monospace, SFMono-Regular, monospace; }
+        input[type="checkbox"] { transform: scale(1.2); cursor: pointer; margin-right: 8px; }
+        #recent-container { margin-top: 30px; width: 80%; text-align: left; }
+        #recent-container h3 { font-size: 14px; color: #8b949e; border-bottom: 1px solid #30363d; padding-bottom: 8px; margin-bottom: 10px; }
+        .recent-item { padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; color: #58a6ff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .recent-item:hover { background: #161b22; text-decoration: underline; }
+        #error-banner { display: none; background: #8e1519; color: white; padding: 8px 20px; font-size: 12px; text-align: center; position: absolute; width: 100%; top: 0; z-index: 1000; }
+        #stale-banner { display: none; background: #d29922; color: #0d1117; padding: 8px 20px; font-size: 12px; text-align: center; font-weight: 600; }
+        #stale-banner button { background: rgba(0,0,0,0.1); color: #0d1117; border: 1px solid rgba(0,0,0,0.1); margin-left: 10px; padding: 2px 8px; font-size: 11px; }
+        #about-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center; }
+        .about-box { background: #161b22; border: 1px solid #30363d; padding: 30px; border-radius: 12px; max-width: 400px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div id="error-banner"></div>
+    <div id="header">
+        <span style="font-weight: bold; color: #58a6ff; cursor: pointer;" onclick="showAbout()">CheckMaker</span>
+        <div style="display: flex; gap: 10px;">
+            <button onclick="selectFile()" style="background: #30363d;">Open</button>
+            <button onclick="showSelector()" style="background: #21262d;">Home</button>
+        </div>
+    </div>
+
+    <div id="tab-bar" style="display: none;"></div>
+    <div id="stale-banner">
+        <span id="stale-msg"></span>
+        <button onclick="reloadActiveTab()">Reload Tab</button>
+    </div>
+
+    <div id="selector">
+        <h2>CheckMaker</h2>
+        <div id="drop-zone" onclick="selectFile()">
+            <p>Drag Markdown files here or click to browse</p>
+        </div>
+        <input type="text" id="path-input" placeholder="Paste absolute path...">
+        <button onclick="loadFromInput()">Open</button>
+        <div id="recent-container" style="display: none;">
+            <h3>Recent Files</h3>
+            <div id="recent-list"></div>
+        </div>
+    </div>
+
+    <div id="viewer-container" style="display: none;">
+        <div id="viewer" class="markdown-body"></div>
+        <div style="padding: 5px 20px; border-top: 1px solid #30363d; background: #0d1117;">
+            <span id="status-path" class="file-path"></span>
+        </div>
+    </div>
+
+    <div id="about-overlay" onclick="hideAbout()">
+        <div class="about-box">
+            <h2>CheckMaker</h2>
+            <div style="color: #8b949e; font-size: 12px; margin-bottom: 20px;">Version 1.0.0</div>
+            <p>Check boxes. Touch nothing else.</p>
+            <button onclick="hideAbout()">Close</button>
+        </div>
+    </div>
+
+    <script>
+        const selector = document.getElementById('selector');
+        const viewerContainer = document.getElementById('viewer-container');
+        const viewer = document.getElementById('viewer');
+        const tabBar = document.getElementById('tab-bar');
+        const staleBanner = document.getElementById('stale-banner');
+        const statusPath = document.getElementById('status-path');
+        const errorBanner = document.getElementById('error-banner');
+
+        let activeTabId = null;
+        let isPolling = false;
+
+        function showError(msg) {
+            errorBanner.innerText = msg;
+            errorBanner.style.display = 'block';
+            setTimeout(() => { errorBanner.style.display = 'none'; }, 5000);
+        }
+
+        function showAbout() { document.getElementById('about-overlay').style.display = 'flex'; }
+        function hideAbout() { document.getElementById('about-overlay').style.display = 'none'; }
+
+        async function updateTabs() {
+            const state = await pywebview.api.get_session_state();
+            if (state.tabs.length === 0) { showSelector(); return; }
+
+            tabBar.style.display = 'flex';
+            tabBar.innerHTML = '';
+            state.tabs.forEach(tab => {
+                const el = document.createElement('div');
+                el.className = 'tab' + (tab.active ? ' active' : '');
+                el.onclick = () => switchTab(tab.id);
+                if (tab.stale) {
+                    const icon = document.createElement('span');
+                    icon.className = 'tab-stale-icon';
+                    icon.innerText = '⚠️';
+                    el.appendChild(icon);
+                }
+                const title = document.createElement('span');
+                title.innerText = tab.title;
+                el.appendChild(title);
+                const close = document.createElement('span');
+                close.className = 'tab-close';
+                close.innerText = '×';
+                close.onclick = (e) => { e.stopPropagation(); closeTab(tab.id); };
+                el.appendChild(close);
+                tabBar.appendChild(el);
+            });
+            activeTabId = state.active_tab_id;
+        }
+
+        async function switchTab(tabId) {
+            const data = await pywebview.api.switch_tab(tabId);
+            renderTab(data);
+        }
+
+        async function closeTab(tabId) {
+            await pywebview.api.close_tab(tabId);
+            updateTabs();
+            if (activeTabId) {
+                const data = await pywebview.api.get_tab_info(activeTabId);
+                renderTab(data);
+            }
+        }
+
+        function showSelector() {
+            selector.style.display = 'flex';
+            viewerContainer.style.display = 'none';
+            tabBar.style.display = 'none';
+            staleBanner.style.display = 'none';
+            activeTabId = null;
+            loadRecentFiles();
+        }
+
+        async function renderTab(data) {
+            if (!data || data.error) { showError(data?.error || "Load failed"); return; }
+            selector.style.display = 'none';
+            viewerContainer.style.display = 'flex';
+            statusPath.innerText = data.path;
+            marked.setOptions({ gfm: true, breaks: true });
+            viewer.innerHTML = marked.parse(data.content);
+            staleBanner.style.display = data.stale ? 'block' : 'none';
+            if (data.stale) document.getElementById('stale-msg').innerText = "File modified externally.";
+
+            const checkboxes = viewer.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach((cb, index) => {
+                cb.disabled = false;
+                cb.onclick = async (e) => {
+                    e.preventDefault();
+                    if (data.stale) { showError("File out of sync. Reload tab."); return; }
+                    cb.disabled = true;
+                    const result = await pywebview.api.toggle_checkbox(data.id, index);
+                    cb.disabled = false;
+                    if (result.success) {
+                        cb.checked = (result.char === 'x');
+                    } else {
+                        showError(result.error);
+                        updateTabs();
+                    }
+                };
+            });
+            updateTabs();
+            if (!isPolling) startPolling();
+        }
+
+        async function reloadActiveTab() {
+            if (!activeTabId) return;
+            const data = await pywebview.api.refresh_tab(activeTabId);
+            renderTab(data);
+        }
+
+        function startPolling() {
+            isPolling = true;
+            setInterval(async () => {
+                const updates = await pywebview.api.poll_status();
+                if (Object.keys(updates).length > 0) {
+                    updateTabs();
+                    if (updates[activeTabId]) {
+                        staleBanner.style.display = 'block';
+                        document.getElementById('stale-msg').innerText = "File modified externally.";
+                    }
+                }
+            }, 2000);
+        }
+
+        async function selectFile() {
+            const data = await pywebview.api.select_file();
+            renderTab(data);
+        }
+
+        async function loadFromInput() {
+            const val = document.getElementById('path-input').value.trim();
+            if (val === '') {
+                selectFile();
+            } else {
+                const data = await pywebview.api.load_path(val);
+                renderTab(data);
+            }
+        }
+
+        async function loadRecentFiles() {
+            const recent = await pywebview.api.get_recent_files();
+            if (recent && recent.length > 0) {
+                document.getElementById('recent-container').style.display = 'block';
+                const list = document.getElementById('recent-list');
+                list.innerHTML = '';
+                recent.forEach(path => {
+                    const item = document.createElement('div');
+                    item.className = 'recent-item';
+                    item.innerText = path;
+                    item.onclick = async () => {
+                        const data = await pywebview.api.load_path(path);
+                        renderTab(data);
+                    };
+                    list.appendChild(item);
+                });
+            } else {
+                document.getElementById('recent-container').style.display = 'none';
+            }
+        }
+
+        window.addEventListener('keydown', async (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'o') { e.preventDefault(); selectFile(); }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'r') { e.preventDefault(); reloadActiveTab(); }
+            if (e.key === 'Escape') { showSelector(); }
+        });
+
+        document.body.addEventListener('dragover', (e) => e.preventDefault());
+        document.body.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            for (let file of e.dataTransfer.files) {
+                const data = await pywebview.api.load_path(file.path);
+                renderTab(data);
+            }
+        });
+
+        window.onload = loadRecentFiles;
+    </script>
+</body>
+</html>
