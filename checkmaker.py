@@ -1,4 +1,4 @@
-# CheckMaker: A surgical Markdown checklist editor.
+﻿# CheckMaker: A surgical Markdown checklist editor.
 # This tool updates markdown checkboxes directly on disk via binary seeks.
 # By modifying only the target byte, we preserve file encoding, line endings,
 # and prevent unrelated formatting changes.
@@ -92,9 +92,8 @@ class ChecklistProcessor:
                     # Blank lines continue indented blocks but don't reset list state
                     pass
                 elif line.startswith(b'    ') or line.startswith(b'\t'):
-                    # Potential indented code block
-                    if not in_list:
-                        in_indented_code = True
+                    # Indented code blocks take precedence over stale list state.
+                    in_indented_code = True
                 else:
                     in_indented_code = False
                     # Check for list start to handle nested task indentation correctly
